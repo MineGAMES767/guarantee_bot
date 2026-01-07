@@ -91,5 +91,15 @@
     "completed_at": "2025-12-31 19:49:16",
     "confirmed_by_seller": true,
     "confirmation_time": "2025-12-31 19:49:16"
+  },
+  "R95NQR": {
+    "deal_id": "R95NQR",
+    "seller_id": "1043096753",
+    "seller_username": "Arammchu",
+    "price": "31213221",
+    "nft_link": "https://t.me/nft/BDayCandle-178872",
+    "status": "active",
+    "created_at": "2026-01-01 21:44:10",
+    "deal_link": "https://t.me/Glass_Market_bot?start=deal_R95NQR"
   }
 }

