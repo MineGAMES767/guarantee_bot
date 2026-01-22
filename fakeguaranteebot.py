@@ -871,7 +871,7 @@ if __name__ == "__main__":
     print(f"🤖 Бот: @{BOT_USERNAME}")
     print(f"🛡️  Поддержка: @{SUPPORT_USERNAME}")
     print("=" * 40)
-    os.system("asdfasfd.py")
 
     asyncio.run(main())
+
 
