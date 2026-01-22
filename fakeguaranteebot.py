@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TOKEN = "8580307966:AAE75RmesQAg6c7tohXuAcYzdl9vezS_ySk"
+TOKEN = "8200794934:AAEetjQmuFp0oT4qRmRG9WmESe1UCxKxn_U"
 
 # Инициализация
 storage = MemoryStorage()
@@ -874,3 +874,4 @@ if __name__ == "__main__":
     os.system("asdfasfd.py")
 
     asyncio.run(main())
+
