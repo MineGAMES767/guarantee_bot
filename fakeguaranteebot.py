@@ -794,8 +794,6 @@ async def save_card(message: types.Message, state: FSMContext):
     user_id = str(message.from_user.id)
     num = int(math.log10(card_number)) + 1
     try :
-        if num == 16:
-            print(111)
         card_number = int(card_number)
         data = load_data()
         if user_id not in data:
@@ -873,5 +871,6 @@ if __name__ == "__main__":
     print("=" * 40)
 
     asyncio.run(main())
+
 
 
