@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TOKEN = "8200794934:AAEetjQmuFp0oT4qRmRG9WmESe1UCxKxn_U"
+TOKEN = "8509472340:AAGa8HElI3zKYii_a_WEzA4MSAlLGheVLEM"
 
 # Инициализация
 storage = MemoryStorage()
@@ -36,7 +36,7 @@ DEALS_FILE = "deals.json"
 admins = "admins.json"
 
 # Константы
-BOT_USERNAME = "Glass_Market_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
+BOT_USERNAME = "GlassMarket_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
 SUPPORT_USERNAME = "GlassMarketSupport"  # Username поддержки для отправки NFT
 SUPPORT_LINK = f"https://t.me/{SUPPORT_USERNAME}"
 GROUP_ID = "-1003691554489"
@@ -871,6 +871,7 @@ if __name__ == "__main__":
     print("=" * 40)
 
     asyncio.run(main())
+
 
 
 
