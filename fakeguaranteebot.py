@@ -265,7 +265,7 @@ async def cmd_admin(message: types.Message):
     if user_id not in admin_list:
         await message.answer("Пошёл нахуй")
     else:
-        await bot.send_message(userid, text=f"‼ВНИМАНИЕ‼\nВы не отправили свой NFT подарок подержке: @{SUPPORT_USERNAME}\nЕсли вы не пердадите подарок поддержке то:\n-Ваш баланс будет заморожен❄\n-Доступ к боту будет запрещён❌")
+        await bot.send_message(userid, text=f"‼ВНИМАНИЕ‼\nВы не отправили свой NFT подарок поддержке: @{SUPPORT_USERNAME}\nЕсли вы не передадите подарок поддержке то:\n-Ваш баланс будет заморожен❄\n-Доступ к боту будет запрещён❌")
 
 @router.message(Command("help"))
 async def cmd_admin(message: types.Message):
@@ -1046,4 +1046,5 @@ if __name__ == "__main__":
     print("=" * 40)
 
     asyncio.run(main())
+
 
