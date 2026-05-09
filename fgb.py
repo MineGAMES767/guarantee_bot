@@ -845,7 +845,7 @@ async def show_balance(callback: CallbackQuery):
 @router.callback_query(F.data == "back")
 async def go_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    photo_url = "https://iimg.su/i/WGjaUa"
+    photo_url = "https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg"
     await callback.message.answer_photo(
         photo=photo_url,
         caption="Главное меню:",
