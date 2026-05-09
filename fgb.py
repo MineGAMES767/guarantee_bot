@@ -325,7 +325,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
                 return
 
     # Обычный старт
-    photo_url = "https://iimg.su/i/WGjaUa"
+    photo_url = "https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg"
     await message.answer_photo(
         photo=photo_url,
         caption="""
