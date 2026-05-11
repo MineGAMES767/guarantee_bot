@@ -36,7 +36,7 @@ DEALS_FILE = "deals.json"
 admins = "admins.json"
 
 # Константы
-BOT_USERNAME = "GlassMarket_bot"  # ⚠️ БЕЗ @, как в логах: @Glass_Market_bot
+BOT_USERNAME = "GlassMarket_bot"  # ⚠️ БЕЗ @, как в логах: @GlassMarket_bot
 SUPPORT_USERNAME = "GlassMarketSupport"  # Username поддержки для отправки NFT
 SUPPORT_LINK = f"https://t.me/{SUPPORT_USERNAME}"
 GROUP_ID = "-1003691554489"
